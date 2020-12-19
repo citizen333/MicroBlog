@@ -88,8 +88,8 @@ def edit_profile():
     elif request.method == 'GET':
         form.username.data = current_user.username
         form.about_me.data = current_user.about_me
-    return render_template('edit_profile.html', title = 'Edit profile',
-                           form = form)
+    return render_template(
+        'edit_profile.html', title = 'Edit profile', form = form)
     
 @app.route('/follow/<username>', methods = ['POST'])
 @login_required
@@ -128,3 +128,10 @@ def unfollow(username):
         return redirect(url_for('user', username = username))
     else:
         return redirect(url_for('index'))
+    
+@app.route('/explore')
+@login_required
+def explore():
+    posts = Post.query.order_by(Post.timestamp.desc()).all()
+    return render_template(
+        'index.html', title = 'Explore', posts = posts)
