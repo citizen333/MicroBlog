@@ -1,8 +1,10 @@
-from app import db, login
+from app import db, login, app
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from datetime import datetime
 from hashlib import md5
+from time import time
+import jwt
 
 followers = db.Table(
     'followers',
@@ -22,8 +24,8 @@ class User(UserMixin, db.Model):
         'User', secondary = followers,
         primaryjoin = (followers.c.follower_id == id),
         secondaryjoin = (followers.c.followed_id == id),
-        backref = db.backref('followers', lazy = 'dynamic'), lazy = 'dynamic'
-    )
+        backref = db.backref('followers', lazy = 'dynamic'),
+        lazy = 'dynamic')
     
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -36,9 +38,8 @@ class User(UserMixin, db.Model):
     
     def avatar(self, size):
         digest = md5(self.email.lower().encode('utf-8')).hexdigest()
-        return 'https://www.gravatar.com/avatar/{}?d=identicon&s={}'.format(
-            digest, size
-        )
+        return 'https://www.gravatar.com/avatar/{}?d=identicon&s={}'\
+            .format(digest, size)
     
     def follow(self, user):
         if not self.is_following(user):
@@ -61,6 +62,27 @@ class User(UserMixin, db.Model):
             .filter_by(user_id = self.id)\
             .union(followed)\
             .order_by(Post.timestamp.desc())
+            
+    def get_reset_password_token(self, expires_in = 600):
+        jwt_body =\
+            {
+                'reset_password': self.id,
+                'exp': time() + expires_in
+            }
+        return jwt\
+            .encode(
+                jwt_body, app.config['SECRET_KEY'], algorithm='HS256')\
+            .decode('utf-8')
+            
+    @staticmethod
+    def verify_reset_password_token(token):
+        try:
+            id = jwt.decode(
+                token, app.config['SECRET_KEY'],
+                algorithms=['HS256'])['reset_password']
+        except:
+            return
+        return User.query.get(id)
     
 @login.user_loader
 def load_user(id):
